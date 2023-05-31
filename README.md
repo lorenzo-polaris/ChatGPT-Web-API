@@ -55,13 +55,6 @@ Before running the project, make sure you have the following prerequisites insta
 
 4. To stop the server, press `Ctrl + C` in the terminal where the server is running.
 
-## Configuration
-
-The project uses the following configuration options:
-
-- `headless`: Set to `false` to launch the browser in non-headless mode, allowing you to see the browser window during interaction. Change it to `true` if you want to run the browser in headless mode.
-- `userDataDir`: Specifies the directory where the browser session data is stored. By default, it is set to `"./.chatgpt_session"`.
-
 ## Contributing
 
 Contributions to the BrowserChatGPT-API project are welcome. If you encounter any issues, have suggestions, or want to contribute improvements, please feel free to open an issue or submit a pull request on the project's GitHub repository.
