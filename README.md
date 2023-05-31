@@ -55,6 +55,16 @@ Before running the project, make sure you have the following prerequisites insta
 
 4. To stop the server, press `Ctrl + C` in the terminal where the server is running.
 
+## Known limitations and Next Steps
+
+### Delay before parsing response
+The current implementation of the script includes a fixed delay of 4 seconds before parsing the response from ChatGPT. This delay is added to ensure that ChatGPT has finished generating the response. While this provides a reasonable timeframe, it may not be optimal in all scenarios. Consider adjusting the delay based on your specific use case or requirements.
+
+### Error Handling
+The current code does not include comprehensive error handling mechanisms. It's important to implement appropriate error handling to gracefully handle any potential errors or exceptions that may occur during the interaction with ChatGPT. Enhancing the code with robust error handling will help improve the reliability and stability of the API.
+
+Please note that these limitations are provided as a starting point, and it's recommended to review and address them based on your specific needs and use case.
+
 ## Contributing
 
 Contributions to the BrowserChatGPT-API project are welcome. If you encounter any issues, have suggestions, or want to contribute improvements, please feel free to open an issue or submit a pull request on the project's GitHub repository.
