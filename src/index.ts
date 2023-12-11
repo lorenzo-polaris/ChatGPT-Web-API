@@ -1,6 +1,13 @@
 import { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+if (!process.env.CHATGPT_USERNAME || !process.env.CHATGPT_PASSWORD) {
+  throw new Error("Please set CHATGPT_USERNAME and CHATGPT_PASSWORD environment variables");
+}
 
 let browser: Browser;
 let page: Page;
@@ -11,7 +18,7 @@ const startBrowser = async () => {
   browser = await puppeteer.launch({ headless: false, userDataDir: "./.chatgpt_session" });
   page = await browser.newPage();
 
-  await page.goto("https://chat.openai.com/");
+  await page.goto("https://chat.openai.com/?model=gpt-4");
 };
 
 const run = async (prompt: string) => {
@@ -22,10 +29,40 @@ const run = async (prompt: string) => {
     await startBrowser();
   }
 
-  // page.on("dialog", async (dialog) => {
-  //   console.log(dialog.message());
-  //   await dialog.accept();
-  // });
+  // Check if login is required
+  console.log("checking if login is required...");
+  try {
+    const LOGIN_SELECTOR = "[data-testid='login-button']";
+    // Wait for the login button to appear within a certain timeout (e.g., 3 seconds)
+    await page.waitForSelector(LOGIN_SELECTOR, { timeout: 3000 });
+
+    console.log("Login button is present. It is likely that login is required.");
+
+    await page.click(LOGIN_SELECTOR);
+
+    // Wait for the form to appear
+    await page.waitForSelector("form");
+
+    // type into the input with name username
+    await page.type("input[name=username]", process.env.CHATGPT_USERNAME!);
+
+    // Click the submit button
+    await new Promise((r) => setTimeout(r, 2000));
+    await page.click("button[type=submit]");
+
+    // Type the password
+    await page.type("input[name=password]", process.env.CHATGPT_PASSWORD!);
+
+    // Click the submit button (with aria-visible=true)
+    await new Promise((r) => setTimeout(r, 2000));
+    await page.click("button[data-action-button-primary=true][type='submit']");
+
+    await new Promise((r) => setTimeout(r, 3000));
+
+    await page.goto("https://chat.openai.com/?model=gpt-4");
+  } catch (error) {
+    console.log("Login button is not present. It is likely that login is not required.");
+  }
 
   console.log("waiting for #prompt-textarea...");
   await page.waitForSelector("#prompt-textarea");
@@ -41,40 +78,17 @@ const run = async (prompt: string) => {
   await new Promise((r) => setTimeout(r, 5000));
 
   // Upload file
-  const INPUT_SELECTOR = "[aria-label='Attach files'] + input[type=file]";
-  await page.waitForSelector(INPUT_SELECTOR);
+  const FILE_INPUT_SELECTOR = "[aria-label='Attach files'] + input[type=file]";
+  await page.waitForSelector(FILE_INPUT_SELECTOR);
 
-  // Make input visible
-  await page.evaluate((selector) => {
-    const style = document.createElement("style");
-    document.head.appendChild(style);
-    style.sheet?.insertRule(`${selector} { display: block !important; }`);
-  }, INPUT_SELECTOR);
-
-  // page.click("[aria-label='Attach files'] + input[type=file]");
-  // await new Promise((r) => setTimeout(r, 3000));
-
-  const inputFileHandle = await page.$(INPUT_SELECTOR);
+  const inputFileHandle = await page.$(FILE_INPUT_SELECTOR);
   if (!inputFileHandle) throw new Error("File handle not found");
 
-  await inputFileHandle?.uploadFile("test-image.webp");
-
-  await page.evaluate((selector) => {
-    const input = document.querySelector(selector);
-
-    // Trigger change event after setting value
-    function triggerEvent(el: Element, type: string) {
-      var e = document.createEvent("HTMLEvents");
-      e.initEvent(type, false, true);
-      el.dispatchEvent(e);
-    }
-    triggerEvent(input!, "change");
-    triggerEvent(input!, "dragleave");
-  }, INPUT_SELECTOR);
+  await inputFileHandle?.uploadFile("src/test-image.webp");
 
   // Wait hardcoded for now
   console.log("Waiting 10 seconds to complete upload...");
-  await new Promise((r) => setTimeout(r, 10000));
+  await new Promise((r) => setTimeout(r, 5000));
 
   console.log("Waiting for send-button");
   const sendButton = await page.waitForSelector('[data-testid="send-button"]');
@@ -93,10 +107,6 @@ const run = async (prompt: string) => {
   await responseElement?.waitForSelector('[data-message-author-role="assistant"] .markdown');
   console.log("Response div ready");
 
-  // Wait hardcoded for now
-  console.log("Waiting 4 seconds...");
-  await new Promise((r) => setTimeout(r, 4000));
-
   console.log("Looking for result...");
   const textResponse = await page.$eval(
     '[data-testid="conversation-turn-3"] [data-message-author-role="assistant"] .markdown',
@@ -105,60 +115,11 @@ const run = async (prompt: string) => {
     }
   );
 
-  const imageInnerHTML = await page.evaluate((imageElement) => {
-    return imageElement?.innerHTML;
+  const imageURL = await page.evaluate((imageElement) => {
+    return imageElement?.src;
   }, imageHandle);
 
-  return { textResponse, imageResponse: imageInnerHTML };
-
-  // // Wait for input
-  // await page.waitForSelector('[placeholder="Send a message."]');
-
-  // // UI is ready to take an answer
-  // await page.type('[placeholder="Send a message."]', prompt);
-
-  // const buttonElement = await page.waitForSelector(
-  //   `button svg[stroke="currentColor"][viewBox="0 0 16 16"][class="h-4 w-4"]`
-  // );
-
-  // buttonElement.click();
-
-  // const lastMessageContainerSelector = 'div.h-full[class*="react-scroll-to-bottom"] > div';
-  // const lastMessageSelector = `${lastMessageContainerSelector} .group .prose:last-child`;
-
-  // // Wait for the last message container to be visible
-  // await page.waitForSelector(lastMessageContainerSelector, { visible: true });
-
-  // // Wait for the last message to be fully received
-  // // TODO: Make this not hardcoded
-  // await page.waitForTimeout(4000);
-
-  // // Retrieve the last message
-  // const lastMessageElement = await page.waitForSelector(lastMessageSelector);
-  // const lastMessageText = await page.evaluate((element) => element.innerHTML, lastMessageElement);
-
-  // // Click copy to clipboard button
-  // const groupElements = await page.$$(`${lastMessageContainerSelector} .group`);
-  // if (groupElements.length === 0) throw new Error("No group elements found");
-  // const lastGroupElement = groupElements[groupElements.length - 1];
-  // var copyButtonElement = await lastGroupElement.$(`button.flex.ml-auto.gap-2.rounded-md.p-1`);
-
-  // await browser
-  //   .defaultBrowserContext()
-  //   .overridePermissions("https://chat.openai.com", ["clipboard-read", "clipboard-write"]);
-
-  // copyButtonElement.click();
-
-  // await page.waitForTimeout(500);
-
-  // const content = await page.evaluate(async () => {
-  //   // Obtain the content of the clipboard as a string
-  //   return navigator.clipboard.readText();
-  // });
-
-  // console.log("Clipboard content:", content);
-
-  // return lastMessageText;
+  return { textResponse, imageResponse: imageURL };
 };
 
 run(
